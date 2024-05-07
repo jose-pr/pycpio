@@ -1,4 +1,5 @@
 
+from io import IOBase
 from pathlib import Path
 from typing import Union
 
@@ -60,8 +61,12 @@ class PyCPIO:
         """ Writes a CPIO archive to file. """
         kwargs.update({'structure': self.structure,
                        '_log_init': False, 'logger': self.logger})
-        writer = CPIOWriter(self.entries, file_path, **kwargs)
-        writer.write()
+        writer = CPIOWriter(self.entries, **kwargs)
+        writer.write(file_path)
+    
+    def write_fp(self, fp:IOBase, *args, **kwargs):
+        writer = CPIOWriter(self.entries, **kwargs)
+        writer.write_fp(fp)
 
     def list_files(self):
         """ Returns a list of files in the CPIO archive. """
