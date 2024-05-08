@@ -19,6 +19,12 @@ class CPIOWriter(Logged):
         self.stream = stream
         self.structure = structure if structure is not None else HEADER_NEW
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
     def write(self, data: CPIOData | Iterable[CPIOData] | Mapping[str, CPIOData]):
         """
         Writes the CPIOData objects to the output stream.
