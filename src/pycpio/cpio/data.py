@@ -4,16 +4,16 @@ CPIO data objects
 
 from hashlib import sha256
 from pathlib import Path
-from typing import NotRequired, Unpack
+from typing import Unpack
 
-from ..common import Logged, LoggedKwargs
+from ..common import Logged
 from ..header import CPIOHeader, CPIOHeaderKwargs
 from ..masks import CPIOModes, mode_bytes_from_path
 
 
 class CPIODataKwargs(CPIOHeaderKwargs, total=False):
     path: Path
-    modes: CPIOModes
+    mode: CPIOModes
     header: CPIOHeader
     data: bytes
 
@@ -29,6 +29,10 @@ class CPIOData(Logged):
     """"content"""
     hash: str
     """sha256 hash of the data"""
+
+    @property
+    def name(self):
+        return self.header.name
 
     @staticmethod
     def from_dir(
