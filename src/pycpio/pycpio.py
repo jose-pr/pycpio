@@ -13,7 +13,7 @@ from pycpio.writer import CPIOWriter
 class PyCPIO(Logged):
     """A class for using CPIO archives."""
 
-    def __init__(self, structure=HEADER_NEW, *args, **kwargs):
+    def __init__(self, structure=HEADER_NEW, **kwargs):
         super().__init__(**kwargs)
         self.structure = structure
         self.overrides = {}
@@ -24,7 +24,7 @@ class PyCPIO(Logged):
                 self.logger.info("[%s] Setting override: %s" % (attr, value))
                 self.overrides[attr] = value
 
-    def append_cpio(self, path: Path, name: str = None, *args, **kwargs):
+    def append_cpio(self, path: Path, name: str = None, **kwargs):
         """Appends a file or directory to the CPIO archive."""
         kwargs.update(
             {
@@ -38,7 +38,7 @@ class PyCPIO(Logged):
             kwargs["name"] = name
         self.entries.add_entry(CPIOData.from_path(**kwargs))
 
-    def append_recursive(self, path: Path, *args, **kwargs):
+    def append_recursive(self, path: Path, **kwargs):
         """Appends all files under a directory into the CPIO archive."""
         kwargs.update(
             {
@@ -72,16 +72,16 @@ class PyCPIO(Logged):
             **kwargs,
         )
 
-    def read_from_stream(self, stream: IOBase):
+    def read_from_stream(self, stream: IOBase, stop_at_trailer=True):
         """Processes a CPIO archive."""
         reader = CPIOReader(stream, self.overrides, logger=self.logger)
-        for cpio_entry in reader.process_cpio_data():
+        for cpio_entry in reader.read_entry(stop_at_trailer):
             self.entries.add_entry(cpio_entry)
 
-    def read_cpio_file(self, file_path: Path):
+    def read_cpio_file(self, file_path: Path, stop_at_trailer=True):
         """Creates a CPIOReader object and reads the file."""
         with Path(file_path).open("rb") as fp:
-            self.read_from_stream(fp)
+            self.read_from_stream(fp, stop_at_trailer)
 
     def write_cpio_file(self, file_path: Union[Path, str], **kwargs):
         """Writes a CPIO archive to file."""
@@ -113,7 +113,6 @@ class PyCPIO(Logged):
             "data": data,
             "overrides": overrides,
             "logger": self.logger,
-            "_log_init": False,
             **kwargs,
         }
 

@@ -3,8 +3,9 @@ from typing import Iterable, Mapping, Unpack
 
 from ..common import Logged, LoggedKwargs
 from ..cpio import pad_cpio
-from ..cpio.data import CPIOData
+from ..cpio.data import CPIOData, CPIODataKwargs
 from ..header import HEADER_NEW, CPIOHeader
+from ..masks import CPIOModes
 
 
 class CPIOWriter(Logged):
@@ -53,3 +54,18 @@ class CPIOWriter(Logged):
         if close_stream:
             self.stream.close()
         return written
+
+    def add_entry(
+        self, mode: CPIOModes, name: str, data=b"", **kwargs: Unpack[CPIODataKwargs]
+    ):
+
+        kwargs.update(structure=self.structure, logger=self.logger)
+
+        self.write(
+            CPIOData.create_entry(
+                name=name,
+                mode=mode.value,
+                data=data,
+                **kwargs,
+            )
+        )

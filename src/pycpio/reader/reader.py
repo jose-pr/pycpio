@@ -11,9 +11,6 @@ from ..common import Logged
 class CPIOReader(Logged):
     """
     A class for reading CPIO archives.
-    Takes a file path as input, and reads it into self.raw_cpio.
-
-    Once processed, the files are stored in self.entries, which is a dictionary of CPIO entries.
     """
 
     def __init__(self, stream: IOBase, overrides={}, **kwargs):
@@ -49,7 +46,7 @@ class CPIOReader(Logged):
 
         return data
 
-    def process_cpio_header(self) -> CPIOHeader:
+    def read_header(self) -> CPIOHeader:
         """Processes a single CPIO header from self.raw_cpio."""
         header_data = self._read_bytes(110)
 
@@ -74,19 +71,30 @@ class CPIOReader(Logged):
             return
         return header
 
-    def process_cpio_data(self):
+    def read_data(self, header: CPIOHeader | int):
+        datasize = header if isinstance(header, int) else int(header.filesize, 16)
+        return self._read_bytes(datasize, pad=True)
+
+    def read_entry(self, stop_at_trailer=True):
         """Processes the file object self.cpio_file, yielding CPIOData objects."""
         trailer = False
-        while not trailer:
+        while True:
             try:
                 self.logger.debug("At offset: %s" % self.offset)
-                if header := self.process_cpio_header():
+                if header := self.read_header():
+                    trailer = False
                     yield CPIOData.get_subtype(
-                        data=self._read_bytes(int(header.filesize, 16), pad=True),
+                        data=self.read_data(header),
                         header=header,
                     )
-                else:
+                elif stop_at_trailer:
                     break
             except EOFError:
                 if not trailer:
                     self.logger.warning("Reached end of file without finding trailer")
+
+    def __next__(self):
+        yield from self.read_entry(False)
+
+    def __iter__(self):
+        return self

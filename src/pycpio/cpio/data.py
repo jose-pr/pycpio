@@ -4,7 +4,7 @@ CPIO data objects
 
 from hashlib import sha256
 from pathlib import Path
-from typing import Unpack
+from typing import Iterator, Unpack
 
 from ..common import Logged
 from ..header import CPIOHeader, CPIOHeaderKwargs
@@ -37,7 +37,7 @@ class CPIOData(Logged):
     @staticmethod
     def from_dir(
         path: Path, parent=None, relative=None, *args, **kwargs: Unpack[CPIODataKwargs]
-    ):
+    ) -> Iterator["CPIOData"]:
         """
         Returns a list of CPIOData objects from a directory
 
@@ -61,8 +61,7 @@ class CPIOData(Logged):
         else:
             kwargs["name"] = str(path)
 
-        data = []
-        data.append(CPIOData.from_path(path=path, relative=relative, *args, **kwargs))
+        yield CPIOData.from_path(path=path, relative=relative, *args, **kwargs)
         for child in path.iterdir():
             if parent:
                 child_path = parent / child
@@ -75,25 +74,25 @@ class CPIOData(Logged):
                 kwargs["name"] = str(child_path)
 
             if child.is_dir() and not child.is_symlink():
-                data.extend(
-                    CPIOData.from_dir(
-                        path=child_path,
-                        parent=parent,
-                        relative=relative,
-                        *args,
-                        **kwargs,
-                    )
+                yield from CPIOData.from_dir(
+                    path=child_path,
+                    parent=parent,
+                    relative=relative,
+                    *args,
+                    **kwargs,
                 )
+
             else:
-                data.append(
+                yield (
                     CPIOData.from_path(
                         path=child_path, relative=relative, *args, **kwargs
                     )
                 )
-        return data
 
     @staticmethod
-    def from_path(path: Path, relative=None, *args, **kwargs: Unpack[CPIODataKwargs]):
+    def from_path(
+        path: Path, relative=None, *args, **kwargs: Unpack[CPIODataKwargs]
+    ) -> "CPIOData":
         """
         Create a CPIOData object from a path.
         If a name is provided, it will be used instead of the resolved path.
