@@ -17,7 +17,7 @@ class CPIOArchive(dict, Loggified):
     from pycpio.header import HEADER_NEW
     
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name:str, value:CPIOData):
         if name in self:
             raise AttributeError("Entry already exists: %s" % name)
         # Check if the inode already exists

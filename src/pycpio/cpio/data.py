@@ -3,19 +3,39 @@ CPIO data objects
 """
 
 from pathlib import Path
+from typing import Unpack
 
-from pycpio.masks import mode_bytes_from_path
-from ..common import Logged
+from ..common import Logged, LoggedKwargs
+from ..header import CPIOHeader
+from ..masks import CPIOModes, mode_bytes_from_path
+
+
+class CPIODataKwargs(LoggedKwargs):
+    name: str
+    path: Path
+    ino: int
+    modes: CPIOModes
+    mtime: float
+    header: CPIOHeader
+    data: bytes
+
 
 class CPIOData(Logged):
     """
     Generic object for CPIO data.
-    self.header is a CPIOHeader object.
-    self.data is a bytes object.
-    self.hash is the sha256 hash of the data.
     """
+
+    header: CPIOHeader
+    """header"""
+    data: bytes
+    """"content"""
+    hash: str
+    """sha256 hash of the data"""
+
     @staticmethod
-    def from_dir(path: Path, parent=None, relative=None, *args, **kwargs):
+    def from_dir(
+        path: Path, parent=None, relative=None, *args, **kwargs: Unpack[CPIODataKwargs]
+    ):
         """
         Returns a list of CPIOData objects from a directory
 
@@ -35,9 +55,9 @@ class CPIOData(Logged):
             relative = Path(relative).resolve()
 
         if relative:
-            kwargs['name'] = str(path.relative_to(relative))
+            kwargs["name"] = str(path.relative_to(relative))
         else:
-            kwargs['name'] = str(path)
+            kwargs["name"] = str(path)
 
         data = []
         data.append(CPIOData.from_path(path=path, relative=relative, *args, **kwargs))
@@ -48,18 +68,30 @@ class CPIOData(Logged):
                 child_path = child
 
             if relative:
-                kwargs['name'] = str(child_path.relative_to(relative))
+                kwargs["name"] = str(child_path.relative_to(relative))
             else:
-                kwargs['name'] = str(child_path)
+                kwargs["name"] = str(child_path)
 
             if child.is_dir() and not child.is_symlink():
-                data.extend(CPIOData.from_dir(path=child_path, parent=parent, relative=relative, *args, **kwargs))
+                data.extend(
+                    CPIOData.from_dir(
+                        path=child_path,
+                        parent=parent,
+                        relative=relative,
+                        *args,
+                        **kwargs,
+                    )
+                )
             else:
-                data.append(CPIOData.from_path(path=child_path, relative=relative, *args, **kwargs))
+                data.append(
+                    CPIOData.from_path(
+                        path=child_path, relative=relative, *args, **kwargs
+                    )
+                )
         return data
 
     @staticmethod
-    def from_path(path: Path, relative=None, *args, **kwargs):
+    def from_path(path: Path, relative=None, *args, **kwargs: Unpack[CPIODataKwargs]):
         """
         Create a CPIOData object from a path.
         If a name is provided, it will be used instead of the resolved path.
@@ -73,11 +105,11 @@ class CPIOData(Logged):
         from pycpio.header import CPIOHeader
 
         path = Path(path)
-        if logger := kwargs.get('logger'):
+        if logger := kwargs.get("logger"):
             logger.debug(f"Creating CPIO entry from path: {path}")
 
         relative = Path(relative).resolve() if relative else None
-        if logger := kwargs.get('logger'):
+        if logger := kwargs.get("logger"):
             logger.debug("Creating CPIO entry relative to path: %s", relative)
 
         # Unless the path is a symlink, resolve it
@@ -86,100 +118,104 @@ class CPIOData(Logged):
             if not path.exists():
                 raise ValueError("Path does not exist: %s" % path)
 
-        kwargs['path'] = path
+        kwargs["path"] = path
         # If a name is provided, use it, otherwise, use the path, if relative is provided, use the relative path
-        if name := kwargs.pop('name', None):
-            kwargs['name'] = name
+        if name := kwargs.pop("name", None):
+            kwargs["name"] = name
         else:
             if relative:
-                kwargs['name'] = str(path.relative_to(relative))
+                kwargs["name"] = str(path.relative_to(relative))
             else:
-                kwargs['name'] = str(path)
+                kwargs["name"] = str(path)
 
-        if not kwargs.pop('absolute', False):
-            kwargs['name'] = kwargs['name'].lstrip('/')
+        if not kwargs.pop("absolute", False):
+            kwargs["name"] = kwargs["name"].lstrip("/")
 
         # Get the inode number from the path
-        kwargs['ino'] = path.stat().st_ino
+        kwargs["ino"] = path.stat().st_ino
 
         # Get the mode type from the supplied path
-        kwargs['mode'] = mode_bytes_from_path(path)
+        kwargs["mode"] = mode_bytes_from_path(path)
 
         header = CPIOHeader(*args, **kwargs)
-        data = CPIOData.get_subtype(b'', header, *args, **kwargs)
+        data = CPIOData.get_subtype(b"", header, *args, **kwargs)
 
-        if logger := kwargs.get('logger'):
+        if logger := kwargs.get("logger"):
             logger.debug(f"Created CPIO entry from path: {data}")
 
         return data
 
     @staticmethod
-    def create_entry(name: str, *args, **kwargs):
+    def create_entry(name: str, *args, **kwargs: Unpack[CPIODataKwargs]):
         """
         Create a custom CPIO entry using names and args which are parsed by the header.
         Using the created header, the data type is determined and the appropriate object is returned.
         """
         from time import time
+
         from pycpio.header import CPIOHeader
 
-        if logger := kwargs.get('logger'):
+        if logger := kwargs.get("logger"):
             logger.debug(f"Creating CPIO entry: {name}")
 
-        kwargs['mtime'] = kwargs.pop('mtime', time())
-        kwargs['header'] = kwargs.pop('header', CPIOHeader(name=name, *args, **kwargs))
-        kwargs['data'] = kwargs.pop('data', b'')
+        kwargs["mtime"] = kwargs.pop("mtime", time())
+        kwargs["header"] = kwargs.pop("header", CPIOHeader(name=name, *args, **kwargs))
+        kwargs["data"] = kwargs.pop("data", b"")
         data = CPIOData.get_subtype(*args, **kwargs)
 
-        if logger := kwargs.get('logger'):
+        if logger := kwargs.get("logger"):
             logger.info("Created CPIO entry: %s" % data)
 
         return data
 
     @staticmethod
-    def get_subtype(data: bytes, header, *args, **kwargs):
-        """ Get the appropriate subtype for the data based on the header mode type. """
+    def get_subtype(
+        data: bytes, header: CPIOHeader, *args, **kwargs: Unpack[CPIODataKwargs]
+    ):
+        """Get the appropriate subtype for the data based on the header mode type."""
         # Imports must be here so the module can be imported
-        from .file import CPIO_File
-        from .symlink import CPIO_Symlink
         from .chardev import CPIO_CharDev
         from .dir import CPIO_Dir
+        from .file import CPIO_File
+        from .symlink import CPIO_Symlink
 
         mode = header.mode_type
         logger = header.logger
-        kwargs.pop('logger', None)
+        kwargs.pop("logger", None)
 
         args = (data, header, *args)
-        kwargs = {'logger': logger, **kwargs}
+        kwargs = {"logger": logger, **kwargs}
 
         if mode is None:
             # Return the base type for the trailer
             return CPIOData(*args, **kwargs)
 
         match mode.name:
-            case 'File':
+            case "File":
                 return CPIO_File(*args, **kwargs)
-            case 'Symlink':
+            case "Symlink":
                 return CPIO_Symlink(*args, **kwargs)
-            case 'CharDev':
+            case "CharDev":
                 return CPIO_CharDev(*args, **kwargs)
-            case 'Dir':
+            case "Dir":
                 return CPIO_Dir(*args, **kwargs)
             case _:
                 raise NotImplementedError(f"Unknown mode type: {mode.name}")
 
-    def __setattr__(self, name, value):
-        """ Setattr, mostly for making sure the header filesize matches the data length """
+    def __setattr__(self, name: str, value: object):
+        """Setattr, mostly for making sure the header filesize matches the data length"""
         super().__setattr__(name, value)
-        if name == 'data':
+        if name == "data":
             if value:
                 from hashlib import sha256
+
                 self.hash = sha256(value).hexdigest()
             self.header.filesize = len(value)
 
     def __init__(self, data: bytes, header, *args, **kwargs):
         self.header = header
         self.hash = None
-        self.data = data if data is not None else b''
+        self.data = data if data is not None else b""
 
     def __str__(self):
         out_str = f"{self.__class__.__name__} {self.header}"
@@ -187,6 +223,5 @@ class CPIOData(Logged):
         return out_str
 
     def __bytes__(self):
-        """ Convert the data to bytes """
+        """Convert the data to bytes"""
         return bytes(self.header) + self.data
-
