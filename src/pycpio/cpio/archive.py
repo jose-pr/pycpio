@@ -5,15 +5,17 @@ Handles hardlinks and symlinks.
 Normalizes names to be relative to the archive root without changing the header.
 """
 
-from zenlib.logging import loggify
-from zenlib.util import handle_plural
+from logging import Logger, getLogger
 from .symlink import CPIO_Symlink
 
+from ..common import Loggified
 
-@loggify
-class CPIOArchive(dict):
+class CPIOArchive(dict, Loggified):
+    __slots__ = ('logger', )
+
     from .data import CPIOData
     from pycpio.header import HEADER_NEW
+    
 
     def __setitem__(self, name, value):
         if name in self:
@@ -66,8 +68,9 @@ class CPIOArchive(dict):
         """ Check if an entry exists in the archive """
         return super().__contains__(self._normalize_name(name))
 
-    def __init__(self, structure=HEADER_NEW, *args, **kwargs):
+    def __init__(self, structure=HEADER_NEW, *args, logger:Logger = None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.logger = logger or getLogger(self.__class__.__qualname__)
         self.structure = structure
         self.inodes = {}
         self.hashes = {}
@@ -107,7 +110,6 @@ class CPIOArchive(dict):
         """ Make all names relative to the archive root """
         return name.lstrip("/")
 
-    @handle_plural
     def add_entry(self, data: CPIOData):
         """ Add a new entry to the archive """
         entry_name = self._normalize_name(data.header.name)

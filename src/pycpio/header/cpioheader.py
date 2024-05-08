@@ -3,16 +3,15 @@ CPIO header class definition.
 """
 
 
-from zenlib.logging import loggify
 from pycpio.masks import resolve_mode_bytes, print_permissions, resolve_permissions
+from ..common import Logged
 
-
-@loggify
-class CPIOHeader:
+class CPIOHeader(Logged):
     """
     CPIO HEADER, can be initialized from a segment of header data with or without a structure definition.
     """
     def __init__(self, header_data=b'', overrides={}, *args, **kwargs):
+        super().__init__(**kwargs)
         if header_data:
             self.logger.debug("Creating CPIOEntry from header data: %s", header_data)
             self.from_bytes(header_data)

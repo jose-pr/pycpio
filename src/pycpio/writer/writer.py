@@ -1,19 +1,19 @@
 
 from io import IOBase
-from zenlib.logging import loggify
 from pycpio.cpio import pad_cpio
 from pycpio.header import CPIOHeader, HEADER_NEW
 
 from pathlib import Path
 
+from ..common import Logged
 
-@loggify
-class CPIOWriter:
+class CPIOWriter(Logged):
     """
     Takes a list of CPIOData objects,
     writes them to the file specified by output_file.
     """
     def __init__(self, cpio_entries: list, structure=None, *args, **kwargs):
+        super().__init__(**kwargs)
         self.cpio_entries = cpio_entries
         self.structure = structure if structure is not None else HEADER_NEW
 

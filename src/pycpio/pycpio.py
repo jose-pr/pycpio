@@ -3,21 +3,21 @@ from io import IOBase
 from pathlib import Path
 from typing import Union
 
+from pycpio.common import Logged
 from pycpio.cpio import CPIOArchive, CPIOData
 from pycpio.masks import CPIOModes
 from pycpio.header import HEADER_NEW
 from pycpio.writer import CPIOWriter
 from pycpio.reader import CPIOReader
-from zenlib.logging import loggify
 
 
-@loggify
-class PyCPIO:
+class PyCPIO(Logged):
     """ A class for using CPIO archives. """
     def __init__(self, structure=HEADER_NEW, *args, **kwargs):
+        super().__init__(**kwargs)
         self.structure = structure
         self.overrides = {}
-        self.entries = CPIOArchive(self.structure, logger=self.logger, _log_init=False)
+        self.entries = CPIOArchive(self.structure, logger=self.logger)
 
         for attr in self.structure:
             if value := kwargs.pop(attr, None):
@@ -27,7 +27,7 @@ class PyCPIO:
     def append_cpio(self, path: Path, name: str = None, *args, **kwargs):
         """ Appends a file or directory to the CPIO archive. """
         kwargs.update({'path': path, 'structure': self.structure, 'overrides': self.overrides,
-                       'logger': self.logger, '_log_init': False})
+                       'logger': self.logger})
         if name:
             kwargs['name'] = name
         self.entries.add_entry(CPIOData.from_path(**kwargs))
@@ -35,8 +35,9 @@ class PyCPIO:
     def append_recursive(self, path: Path, *args, **kwargs):
         """ Appends all files under a directory into the CPIO archive. """
         kwargs.update({'path': path, 'structure': self.structure, 'overrides': self.overrides,
-                       'logger': self.logger, '_log_init': False})
-        self.entries.add_entry(CPIOData.from_dir(**kwargs))
+                       'logger': self.logger})
+        for data in CPIOData.from_dir(**kwargs):
+            self.entries.add_entry(data)
 
     def remove_cpio(self, name: str):
         """ Removes an entry from the CPIO archive. """

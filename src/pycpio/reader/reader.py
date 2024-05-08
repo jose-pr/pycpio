@@ -4,11 +4,10 @@ from typing import Union
 
 from pycpio.cpio import CPIOArchive, pad_cpio, CPIOData
 from pycpio.header import CPIOHeader
-from zenlib.logging import loggify
 
+from ..common import Logged
 
-@loggify
-class CPIOReader:
+class CPIOReader(Logged):
     """
     A class for reading CPIO archives.
     Takes a file path as input, and reads it into self.raw_cpio.

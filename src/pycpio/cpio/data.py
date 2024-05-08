@@ -4,12 +4,10 @@ CPIO data objects
 
 from pathlib import Path
 
-from zenlib.logging import loggify
 from pycpio.masks import mode_bytes_from_path
+from ..common import Logged
 
-
-@loggify
-class CPIOData:
+class CPIOData(Logged):
     """
     Generic object for CPIO data.
     self.header is a CPIOHeader object.
