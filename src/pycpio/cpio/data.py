@@ -2,20 +2,18 @@
 CPIO data objects
 """
 
+from hashlib import sha256
 from pathlib import Path
-from typing import Unpack
+from typing import NotRequired, Unpack
 
 from ..common import Logged, LoggedKwargs
-from ..header import CPIOHeader
+from ..header import CPIOHeader, CPIOHeaderKwargs
 from ..masks import CPIOModes, mode_bytes_from_path
 
 
-class CPIODataKwargs(LoggedKwargs):
-    name: str
+class CPIODataKwargs(CPIOHeaderKwargs, total=False):
     path: Path
-    ino: int
     modes: CPIOModes
-    mtime: float
     header: CPIOHeader
     data: bytes
 
@@ -207,8 +205,6 @@ class CPIOData(Logged):
         super().__setattr__(name, value)
         if name == "data":
             if value:
-                from hashlib import sha256
-
                 self.hash = sha256(value).hexdigest()
             self.header.filesize = len(value)
 

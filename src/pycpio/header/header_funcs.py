@@ -4,7 +4,7 @@ CPIO header definitions and parsing.
 
 from .headers import HEADER_NEW
 
-lookup_table = {b'070701': HEADER_NEW}
+lookup_table = {b"070701": HEADER_NEW}
 
 
 def get_header_from_magic(magic: bytes) -> dict:
@@ -17,7 +17,7 @@ def get_header_from_magic(magic: bytes) -> dict:
     raise ValueError("Unknown magic number: %s" % magic)
 
 
-def get_magic_from_header(header: dict) -> dict:
+def get_magic_from_header(header: dict) -> bytes:
     """
     Return the magic number for the given header format.
     """

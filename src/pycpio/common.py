@@ -6,7 +6,7 @@ class Loggified(Protocol):
     logger: Logger
 
 
-class LoggedKwargs(TypedDict):
+class LoggedKwargs(TypedDict, total=False):
     logger: Logger
 
 
