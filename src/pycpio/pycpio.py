@@ -72,24 +72,24 @@ class PyCPIO(Logged):
             **kwargs,
         )
 
+    def read_from_stream(self, stream: IOBase):
+        """Processes a CPIO archive."""
+        reader = CPIOReader(stream, self.overrides, logger=self.logger)
+        for cpio_entry in reader.process_cpio_data():
+            self.entries.add_entry(cpio_entry)
+
     def read_cpio_file(self, file_path: Path):
         """Creates a CPIOReader object and reads the file."""
-        kwargs = {
-            "input_file": file_path,
-            "overrides": self.overrides,
-            "logger": self.logger,
-            "_log_init": False,
-        }
-        reader = CPIOReader(**kwargs)
-        self.entries.update(reader.entries)
+        with Path(file_path).open("rb") as fp:
+            self.read_from_stream(fp)
 
     def write_cpio_file(self, file_path: Union[Path, str], **kwargs):
         """Writes a CPIO archive to file."""
         kwargs.update({"structure": self.structure, "logger": self.logger})
         with Path(file_path).open("wb") as fp:
-            self.write_to_fp(fp, **kwargs)
+            self.write_to_stream(fp, **kwargs)
 
-    def write_to_fp(self, fp: IOBase, **kwargs):
+    def write_to_stream(self, fp: IOBase, **kwargs):
         writer = CPIOWriter(fp, **kwargs)
         writer.write(self.entries)
         writer.close()

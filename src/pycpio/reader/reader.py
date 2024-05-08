@@ -1,11 +1,12 @@
-
+from io import IOBase
 from pathlib import Path
 from typing import Union
 
-from pycpio.cpio import CPIOArchive, pad_cpio, CPIOData
+from pycpio.cpio import CPIOArchive, CPIOData, pad_cpio
 from pycpio.header import CPIOHeader
 
 from ..common import Logged
+
 
 class CPIOReader(Logged):
     """
@@ -14,56 +15,52 @@ class CPIOReader(Logged):
 
     Once processed, the files are stored in self.entries, which is a dictionary of CPIO entries.
     """
-    def __init__(self, input_file: Union[Path, str], overrides={}, *args, **kwargs):
-        self.file_path = Path(input_file)
-        assert self.file_path.exists(), "File does not exist: %s" % self.file_path
 
+    def __init__(self, stream: IOBase, overrides={}, **kwargs):
+        super().__init__(**kwargs)
+        self.stream = stream
         self.overrides = overrides
-        self.entries = CPIOArchive(logger=self.logger, _log_init=False)
-
-        self.read_cpio_file()
-        self.process_cpio_file()
-
-    def _read_bytes(self, num_bytes: int, pad=False):
-        """ Reads num_bytes from self.raw_cpio, starting at self.offset. """
-        if not num_bytes:
-            return b''
-
-        data = self.cpio_file[self.offset:self.offset + num_bytes]
-        if len(data) > 256:
-            self.logger.debug("Read %s bytes: %s...%s" % (num_bytes, data[:128], data[-128:]))
-        else:
-            self.logger.debug("Read %s bytes: %s" % (num_bytes, data))
-        self.offset += num_bytes
-
-        if pad:
-            pad_size = pad_cpio(self.offset)
-            self.logger.debug("Padding offset by %s bytes" % pad_size)
-            self.offset += pad_size
-        return data
-
-    def read_cpio_file(self):
-        """ Reads a CPIO archive. """
-        self.logger.debug("Reading file: %s" % self.file_path)
-        with open(self.file_path, 'rb') as cpio_file:
-            self.cpio_file = cpio_file.read()
-            self.logger.info("[%s] Read bytes: %s" % (self.file_path, len(self.cpio_file)))
-
-        self.logger.debug("Setting offset to 0")
+        self.entries = CPIOArchive(
+            logger=self.logger,
+        )
         self.offset = 0
 
+    def _read_bytes(self, num_bytes: int, pad=False) -> bytes:
+        """Reads num_bytes from self.raw_cpio, starting at self.offset."""
+        data: bytes = b""
+        read = 0
+        while read < num_bytes:
+            data += self.stream.read(num_bytes - read)
+            _read = len(data)
+            if not _read:
+                raise EOFError
+            read = _read
+        self.offset += read
+        if len(data) > 256:
+            self.logger.debug(
+                "Read %s bytes: %s...%s" % (num_bytes, data[:128], data[-128:])
+            )
+        else:
+            self.logger.debug("Read %s bytes: %s" % (num_bytes, data))
+
+        if pad:
+            pad_size = pad_cpio(read)
+            self.logger.debug("Padding offset by %s bytes" % pad_size)
+
+        return data
+
     def process_cpio_header(self) -> CPIOHeader:
-        """ Processes a single CPIO header from self.raw_cpio. """
+        """Processes a single CPIO header from self.raw_cpio."""
         header_data = self._read_bytes(110)
 
-        # Start using the class kwargs, as they may contain overrides
-        kwargs = {'header_data': header_data, 'overrides': self.overrides, 'logger': self.logger, '_log_init': False}
-
         try:
-            header = CPIOHeader(**kwargs)
+            header = CPIOHeader(header_data, self.overrides, logger=self.logger)
         except ValueError as e:
             self.logger.error("Failed to process header: %s" % e)
-            self.logger.info("[%s] Header data at offset %d: %s" % (self.file_path, self.offset, header_data))
+            self.logger.info(
+                "[%s] Header data at offset %d: %s"
+                % (self.stream, self.offset, header_data)
+            )
             return
 
         # Get the filename now that we know the size
@@ -78,20 +75,18 @@ class CPIOReader(Logged):
         return header
 
     def process_cpio_data(self):
-        """ Processes the file object self.cpio_file, yielding CPIOData objects. """
-        while self.offset < len(self.cpio_file):
-            self.logger.debug("At offset: %s" % self.offset)
-
-            if header := self.process_cpio_header():
-                kwargs = {'data': self._read_bytes(int(header.filesize, 16), pad=True),
-                          'header': header, '_log_init': False}
-                yield CPIOData.get_subtype(**kwargs)
-            else:
-                break
-        else:
-            self.logger.warning("Reached end of file without finding trailer")
-
-    def process_cpio_file(self):
-        """ Processes a CPIO archive."""
-        for cpio_entry in self.process_cpio_data():
-            self.entries.add_entry(cpio_entry)
+        """Processes the file object self.cpio_file, yielding CPIOData objects."""
+        trailer = False
+        while not trailer:
+            try:
+                self.logger.debug("At offset: %s" % self.offset)
+                if header := self.process_cpio_header():
+                    yield CPIOData.get_subtype(
+                        data=self._read_bytes(int(header.filesize, 16), pad=True),
+                        header=header,
+                    )
+                else:
+                    break
+            except EOFError:
+                if not trailer:
+                    self.logger.warning("Reached end of file without finding trailer")
